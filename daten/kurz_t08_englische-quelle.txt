@@ -1,0 +1,17 @@
+Notes from a short talk by Wissensblitz KI (fictional, synthetic)
+
+Topic: Three small ways a corner shop can use AI this week.
+
+Most advice about AI in retail is written for large chains. This talk is for shops with a handful of staff. You do not need a budget, a consultant or a new system. You need ten minutes a day and one small task.
+
+First, shelf labels and offer signs. Tell the assistant what the product is, who the sign is for, how long the text should be and what tone fits your shop. Ask for three options and pick one. Always read it before you print it. The assistant does not know your shop and it will sometimes invent details.
+
+Second, sales figures. Most tills can export sales as a table. Ask the assistant which items sold faster or slower than usual and what you might order more of next week. Treat the answer as a second opinion. It does not replace your own judgement.
+
+Third, replies to customer questions. Build five templates for the questions you hear most often: opening hours, returns, availability, vouchers and orders. Adjust two words and send. Customers of a small shop want to notice that a person is answering, so keep the last step with a human.
+
+Two warnings. Do not type names, sick notes or other personal details into any tool you have not checked. Placeholders such as "employee A" are enough. And do not let the assistant change prices or send orders on its own. It works with the numbers it gets. If the numbers are wrong, the result is wrong.
+
+How to start: pick the signs. Do it for two weeks. Write down how long the task took before and how long it takes now. If you see no difference, stop. You have lost nothing.
+
+Our rule of thumb: the AI writes the draft, a person gives the approval.

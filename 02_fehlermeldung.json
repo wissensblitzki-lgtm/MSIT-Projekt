@@ -1,0 +1,65 @@
+{
+  "name": "Wissensblitz KI – Fehlermeldung",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 🚨 Fehler-Workflow\nWird automatisch gestartet, wenn die Content-Pipeline abbricht (z. B. KI nicht erreichbar, Quelle zu kurz, ungültige Antwort). Schickt sofort eine Nachricht aufs Handy.\n\nIn der Pipeline: Einstellungen → Error Workflow → diesen Workflow wählen.",
+        "height": 240,
+        "width": 380
+      },
+      "id": "14c5dee5-30cd-453a-aecd-8f3f6b82a556",
+      "name": "Notiz",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -260
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "4ebcb419-bfb6-4c12-970f-e2b4a4d4e248",
+      "name": "Fehler aufgetreten",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "DEINE_TELEGRAM_CHAT_ID",
+        "text": "=🚨 Fehler in „{{ $json.workflow.name }}“\nSchritt: {{ $json.execution.lastNodeExecuted }}\nGrund: {{ $json.execution.error.message }}\nZeit: {{ $now.setZone('Europe/Berlin').toFormat('dd.MM.yyyy HH:mm') }}\n\nNichts wurde veröffentlicht. Fallback: später erneut starten oder Texte von Hand schreiben.\n{{ $json.execution.url }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "c0a9f914-6c59-4bc5-926e-69bbd27781c0",
+      "name": "Fehler ans Handy",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Fehler aufgetreten": {
+      "main": [
+        [
+          {
+            "node": "Fehler ans Handy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

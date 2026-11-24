@@ -1,0 +1,762 @@
+{
+  "name": "Wissensblitz KI – Content-Pipeline v2",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## ⚡ Wissensblitz KI – Content-Pipeline (Version 2)\n\n**Weg A (automatisch):** Neues YouTube-Video → Abschrift holen\n**Weg B (Test & Demo):** Text per Formular einfügen\n\nDanach: **Regeln ohne KI** (Internes entfernen, Pflichtaussagen merken) → KI zieht Fakten → KI schreibt Entwürfe → **Regeln prüfen** → Telegram → **Mensch gibt frei** → Protokoll\n\n**Vorher eintragen:**\n1. Kanal-ID im Knoten *Neues YouTube-Video* (eigener Kanal)\n2. Telegram Chat-ID in allen Telegram-Knoten\n3. Zugangsdaten: Gemini, Telegram, Supadata (Header Auth), Google Sheets\n4. Google-Tabelle mit Blatt *Protokoll* im Knoten *Ins Protokoll*\n5. Einstellungen → Error Workflow: *Wissensblitz KI – Fehlermeldung*",
+        "height": 420,
+        "width": 460
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "711d97e5-b1e2-42ee-ae48-1bc32d910d28",
+      "name": "Notiz"
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyHour"
+            }
+          ]
+        },
+        "feedUrl": "https://www.youtube.com/feeds/videos.xml?channel_id=DEINE_KANAL_ID"
+      },
+      "type": "n8n-nodes-base.rssFeedReadTrigger",
+      "typeVersion": 1,
+      "position": [
+        528,
+        384
+      ],
+      "id": "35e33c30-b76c-4408-a372-2f62bb91979b",
+      "name": "Neues YouTube-Video"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Holt aus dem neuen YouTube-Eintrag Titel, Link und Vorschaubild.\nconst it = $input.item.json;\nconst link = it.link || '';\nconst m = link.match(/[?&]v=([\\w-]{6,})/) || link.match(/youtu\\.be\\/([\\w-]{6,})/) || String(it.id || '').match(/yt:video:([\\w-]{6,})/);\nconst videoId = m ? m[1] : '';\nreturn { json: {\n  titel: it.title || 'Ohne Titel',\n  videoUrl: videoId ? 'https://www.youtube.com/watch?v=' + videoId : link,\n  bild: videoId ? 'https://i.ytimg.com/vi/' + videoId + '/hqdefault.jpg' : '',\n  veroeffentlicht: it.isoDate || it.pubDate || ''\n}};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        384
+      ],
+      "id": "6ffff9f6-db49-47ef-91c8-67dd2d5603d7",
+      "name": "Video-Daten"
+    },
+    {
+      "parameters": {
+        "url": "https://api.supadata.ai/v1/transcript",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "={{ $json.videoUrl }}"
+            },
+            {
+              "name": "text",
+              "value": "true"
+            },
+            {
+              "name": "lang",
+              "value": "de"
+            },
+            {
+              "name": "mode",
+              "value": "auto"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        384
+      ],
+      "id": "3a6a51e1-1d14-4d5c-8acd-0ff9b4f78a77",
+      "name": "Abschrift holen"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "57391c9a-835e-4143-93f0-b657b0771156",
+              "name": "titel",
+              "value": "={{ $('Video-Daten').item.json.titel }}",
+              "type": "string"
+            },
+            {
+              "id": "bac9a71f-71b0-44d0-a0fd-20ddd397440d",
+              "name": "quelltext",
+              "value": "={{ $json.content }}",
+              "type": "string"
+            },
+            {
+              "id": "9d7cea90-b440-4038-a5b7-07dfb4d8da3f",
+              "name": "videoUrl",
+              "value": "={{ $('Video-Daten').item.json.videoUrl }}",
+              "type": "string"
+            },
+            {
+              "id": "ff602bc9-c953-4618-b364-dcdef4484602",
+              "name": "bild",
+              "value": "={{ $('Video-Daten').item.json.bild }}",
+              "type": "string"
+            },
+            {
+              "id": "e3d97a73-75f4-41a0-8b1d-708c1328cfe7",
+              "name": "herkunft",
+              "value": "youtube",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1184,
+        384
+      ],
+      "id": "193106a2-b48d-4530-8232-84ebd8f7dcf0",
+      "name": "Quelle aus YouTube"
+    },
+    {
+      "parameters": {
+        "formTitle": "Wissensblitz KI – Quelle einfügen",
+        "formDescription": "Für Tests: Webinar-Abschrift, Podcast-Abschrift oder Blogartikel einfügen.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Titel",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Video-Link (optional)"
+            },
+            {
+              "fieldLabel": "Quelltext",
+              "fieldType": "textarea",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        528,
+        640
+      ],
+      "id": "07a606b5-3f84-4010-8190-bda88624a212",
+      "name": "Test-Formular",
+      "webhookId": "3f1780f3-cf5f-4cea-9e96-0847ac061a1d"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "936f34fb-7822-447b-9d5e-3ee9473d058c",
+              "name": "titel",
+              "value": "={{ $json.Titel }}",
+              "type": "string"
+            },
+            {
+              "id": "b5410087-594b-4ee3-9e94-ebd9dfe98054",
+              "name": "quelltext",
+              "value": "={{ $json.Quelltext }}",
+              "type": "string"
+            },
+            {
+              "id": "d4bad3df-52ba-430c-b488-cf9298e796c1",
+              "name": "videoUrl",
+              "value": "={{ $json['Video-Link (optional)'] }}",
+              "type": "string"
+            },
+            {
+              "id": "136fe434-4f73-4192-8984-aabb26770af4",
+              "name": "bild",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "9d362d90-aa8b-4286-bc25-b83d3939af00",
+              "name": "herkunft",
+              "value": "formular",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1184,
+        640
+      ],
+      "id": "ff6e0c15-588e-488a-a5bb-476b992c03df",
+      "name": "Quelle aus Formular"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2c82dce0-e5ca-4ef4-a3c2-913de3ce4db9",
+              "name": "styleGuide",
+              "value": "BRAND-STYLE-GUIDE WISSENSBLITZ KI\nWer wir sind: Wissensblitz KI erklärt Händlern und kleinen Firmen, wie sie KI im Alltag nutzen.\nTon: locker, freundlich, motivierend. Wir duzen die Leser.\nSprache: kurze Sätze (max. 15 Wörter), einfache Wörter. Fachwörter nur mit kurzer Erklärung.\nHaltung: ehrlich und praktisch. Keine Übertreibungen wie \"revolutionär\" oder \"Gamechanger\".\nEmojis: sparsam, höchstens 2 pro Text. Erlaubt: ⚡ 💡 ✅ 👉\nMarkenzeichen: Der Blitz ⚡ steht für \"schnell verstanden\".\nImmer: ein konkretes Beispiel aus dem Alltag und eine klare Handlungsaufforderung am Ende.\nNiemals: erfundene Zahlen, Versprechen von Umsatz oder Gewinn, Abwertung von Mitbewerbern, Angstmache.",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1408,
+        512
+      ],
+      "id": "7af37d0c-c6eb-4870-a306-638a6737ac2b",
+      "name": "Style-Guide & Regeln"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Du bist Redakteur bei Wissensblitz KI. Lies die QUELLE und ziehe die Fakten heraus.\n\nREGELN:\n- Nimm NUR Aussagen, die wirklich in der Quelle stehen. Erfinde nichts.\n- \"woertliche_zitate\": Sätze, die in Anführungszeichen stehen oder als Zitat gekennzeichnet sind. Übernimm sie Zeichen für Zeichen.\n- \"nicht_verwenden\": alles, was als intern, vertraulich, \"nicht veröffentlichen\", \"off the record\", Gerücht oder persönliche Daten markiert ist.\n- \"unsicher\": Aussagen ohne Beleg, Schätzungen, Zahlen ohne Quelle.\n\nAntworte NUR mit gültigem JSON, ohne Erklärung, in genau diesem Format:\n{\"thema\": \"\", \"kernaussagen\": [\"\"], \"fakten\": [\"\"], \"woertliche_zitate\": [\"\"], \"nicht_verwenden\": [\"\"], \"unsicher\": [\"\"]}\n\nTITEL: {{ $json.titel }}\n\nQUELLE:\n{{ $json.quelltext }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.5,
+      "position": [
+        1872,
+        512
+      ],
+      "id": "4bd7ada6-0a05-44e9-9cab-d7cec4f12b5f",
+      "name": "Fakten ziehen (KI)"
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1872,
+        720
+      ],
+      "id": "8db7f3ec-c832-450a-93cf-0cfadaab2fcd",
+      "name": "Gemini (genau)",
+      "credentials": {
+        "googlePalmApi": {
+          "id": null,
+          "name": "",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Liest die Antwort der KI (JSON) und prüft, ob eine Quelle da ist.\nconst quelle = $('Regeln: Quelle prüfen (ohne KI)').first().json;\nif (!quelle.quelltext || quelle.quelltext.length < 200) {\n  throw new Error('Keine oder zu kurze Quelle/Abschrift gefunden. Bitte Abschrift prüfen.');\n}\n\nlet roh = $input.first().json.text || '';\nroh = roh.replace(/```json/gi, '').replace(/```/g, '').trim();\n\nlet fakten;\ntry {\n  fakten = JSON.parse(roh);\n} catch (e) {\n  throw new Error('Die KI hat kein gültiges JSON geliefert (Fakten). Antwort: ' + roh.slice(0, 300));\n}\n\n// Fehlende Felder mit leeren Listen auffüllen\nfor (const feld of ['kernaussagen', 'fakten', 'woertliche_zitate', 'nicht_verwenden', 'unsicher']) {\n  if (!Array.isArray(fakten[feld])) fakten[feld] = [];\n}\n\nreturn [{ json: { fakten } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2112,
+        512
+      ],
+      "id": "8ab994e7-3215-413b-b6f2-fd9fbf918d2b",
+      "name": "Fakten lesen"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Du bist Social-Media-Redakteur bei Wissensblitz KI. Schreibe aus den FAKTEN die Entwürfe.\n\n{{ $('Style-Guide & Regeln').first().json.styleGuide }}\n\nSTRENGE REGELN:\n1. Verwende NUR Inhalte aus FAKTEN, KERNAUSSAGEN und WÖRTLICHE ZITATE. Erfinde keine Zahlen, Namen oder Beispiele mit Zahlen.\n2. Wörtliche Zitate übernimmst du exakt, Zeichen für Zeichen, in „deutschen Anführungszeichen“.\n3. Inhalte aus NICHT VERWENDEN dürfen in keinem Text vorkommen, auch nicht umschrieben.\n4. Steht eine Aussage unter UNSICHER, schreibe direkt dahinter [PRÜFEN].\n5. Alle Texte auf Deutsch, per Du.\n\nFORMATE:\n- instagram: Bildunterschrift, 80–150 Wörter, starker erster Satz, am Ende 5–8 Hashtags.\n- linkedin: 150–250 Wörter, erster Satz macht neugierig, kurze Absätze, am Ende eine Frage an die Leser.\n- x_thread: Liste mit 4–6 Tweets, jeder höchstens 270 Zeichen, erster Tweet mit ⚡.\n- newsletter: 80–120 Wörter, persönlich, mit Hinweis auf das Video.\n- video_skript: Kurzvideo 45–60 Sekunden (ca. 130 Wörter). Aufbau: HOOK (erste 3 Sekunden), 3 Punkte, AUFRUF.\n- email: Zusammenfassung mit \"betreff\" (max. 60 Zeichen) und \"text\" (120–180 Wörter, 3 Stichpunkte, Link-Hinweis).\n\nAntworte NUR mit gültigem JSON, ohne Erklärung:\n{\"instagram\": \"\", \"linkedin\": \"\", \"x_thread\": [\"\", \"\"], \"newsletter\": \"\", \"video_skript\": \"\", \"email\": {\"betreff\": \"\", \"text\": \"\"}}\n\nTITEL: {{ $('Style-Guide & Regeln').first().json.titel }}\nVIDEO-LINK: {{ $('Style-Guide & Regeln').first().json.videoUrl }}\n\nKERNAUSSAGEN: {{ JSON.stringify($json.fakten.kernaussagen) }}\nFAKTEN: {{ JSON.stringify($json.fakten.fakten) }}\nWÖRTLICHE ZITATE: {{ JSON.stringify($json.fakten.woertliche_zitate) }}\nUNSICHER: {{ JSON.stringify($json.fakten.unsicher) }}\nNICHT VERWENDEN: {{ JSON.stringify($json.fakten.nicht_verwenden) }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.5,
+      "position": [
+        2320,
+        512
+      ],
+      "id": "f35842f9-e301-4b6f-a5d1-442231658fd6",
+      "name": "Entwürfe schreiben (KI)"
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0.6
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        2320,
+        720
+      ],
+      "id": "1e9adc62-2636-4f98-9b7a-5dfb2cf80e29",
+      "name": "Gemini (kreativ)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prüft die Entwürfe gegen die Quelle und baut die Telegram-Nachrichten.\nconst quelle = $('Regeln: Quelle prüfen (ohne KI)').first().json;\nconst fakten = $('Fakten lesen').first().json.fakten;\n\nlet roh = $input.first().json.text || '';\nroh = roh.replace(/```json/gi, '').replace(/```/g, '').trim();\nlet e;\ntry {\n  e = JSON.parse(roh);\n} catch (err) {\n  throw new Error('Die KI hat kein gültiges JSON geliefert (Entwürfe). Antwort: ' + roh.slice(0, 300));\n}\n\n// Text vereinheitlichen, damit Leerzeichen und Anführungszeichen den Vergleich nicht stören\nconst norm = (t) => String(t || '')\n  .replace(/[„“”\"«»‚‘’']/g, '')\n  .replace(/\\s+/g, ' ')\n  .trim()\n  .toLowerCase();\nconst quellNorm = norm(quelle.quelltext);\n\nconst xThread = Array.isArray(e.x_thread) ? e.x_thread : [String(e.x_thread || '')];\nconst email = e.email || {};\nconst alleTexte = [e.instagram, e.linkedin, xThread.join('\\n'), e.newsletter, e.video_skript, email.betreff, email.text].join('\\n');\n\nconst hinweise = [];\n\n// 1) Zitat-Prüfung: Jedes Zitat in „...“ muss wörtlich in der Quelle stehen\nconst zitate = [...alleTexte.matchAll(/„([^“”\"]{8,})[“”\"]/g)].map(m => m[1]);\nfor (const z of zitate) {\n  if (!quellNorm.includes(norm(z))) hinweise.push('Zitat nicht wörtlich in der Quelle: „' + z + '“');\n}\n\n// 2) Gesperrtes Material darf nicht vorkommen\nfor (const sperre of fakten.nicht_verwenden) {\n  const stueck = norm(sperre).split(' ').slice(0, 6).join(' ');\n  if (stueck.length > 10 && norm(alleTexte).includes(stueck)) {\n    hinweise.push('Gesperrtes Material verwendet: ' + sperre);\n  }\n}\n\n// 3) X-Thread: Länge pro Tweet prüfen\nxThread.forEach((t, i) => {\n  if (t.length > 280) hinweise.push('Tweet ' + (i + 1) + ' ist zu lang (' + t.length + ' Zeichen)');\n});\n\n\n// 5) FESTE REGEL: Pflichtaussagen ([[EXAKT]]) müssen wörtlich oder gar nicht vorkommen\nconst regeln = $('Regeln: Quelle prüfen (ohne KI)').first().json;\nconst normW = t => String(t || '').replace(/[„“”«»\"]/g, '\"').replace(/[‚‘’]/g, \"'\").replace(/\\s+/g, ' ').trim();\nconst alleNorm = normW(alleTexte);\nconst wortListe = (t, min) => [...new Set((normW(t).toLowerCase().match(/[a-zäöüß]+|\\d+(?:[.,:]\\d+)*/g) || []).filter(w => /\\d/.test(w) || w.length >= min))];\nconst hatWort = (t, w) => new RegExp('(^|[^a-zäöüß0-9])' + w.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&') + '($|[^a-zäöüß0-9])', 'i').test(t);\nlet pflichtOk = 0;\nfor (const p of regeln.pflichtaussagen) {\n  const P = normW(p);\n  if (alleNorm.includes(P)) { pflichtOk++; continue; }\n  const kw = wortListe(P, 7);\n  if (kw.length && kw.filter(w => hatWort(alleNorm, w)).length / kw.length >= 0.6) hinweise.push('Pflichtaussage verändert: „' + P.slice(0, 60) + '…“');\n}\n// 6) FESTE REGEL: Wörter, die nur in internen Abschnitten stehen, dürfen nicht auftauchen\nconst quelleKlein = normW(quelle.quelltext).toLowerCase();\nconst leck = wortListe(regeln.intern_abschnitte.join(' '), 6).filter(w => !hatWort(quelleKlein, w) && hatWort(alleNorm, w));\nif (leck.length) hinweise.push('Internes Material im Text: ' + leck.slice(0, 5).join(', '));\n\n// 4) Unsichere Stellen zählen\nconst pruefen = (alleTexte.match(/\\[PRÜFEN\\]/g) || []).length;\n\nconst kopf = '⚡ NEUE ENTWÜRFE: ' + quelle.titel + '\\n'\n  + (quelle.videoUrl ? 'Video: ' + quelle.videoUrl + '\\n' : '')\n  + (quelle.bild ? 'Bild: ' + quelle.bild + '\\n' : '')\n  + '\\nInterne Abschnitte entfernt: ' + quelle.intern_entfernt + ' | Pflichtaussagen wörtlich: ' + pflichtOk + '/' + regeln.pflichtaussagen.length\n  + '\\nMarkiert mit [PRÜFEN]: ' + pruefen\n  + '\\nAutomatische Prüfung: ' + (hinweise.length ? '⚠️ ' + hinweise.length + ' Hinweis(e)\\n- ' + hinweise.join('\\n- ') : '✅ keine Auffälligkeiten');\n\nconst nachrichten = [\n  kopf,\n  '📸 INSTAGRAM\\n\\n' + e.instagram,\n  '💼 LINKEDIN\\n\\n' + e.linkedin,\n  '🐦 X-THREAD\\n\\n' + xThread.map((t, i) => (i + 1) + '/ ' + t).join('\\n\\n'),\n  '📰 NEWSLETTER\\n\\n' + e.newsletter,\n  '🎬 KURZVIDEO-SKRIPT\\n\\n' + e.video_skript,\n  '✉️ E-MAIL\\nBetreff: ' + email.betreff + '\\n\\n' + email.text,\n];\n\nreturn nachrichten.map(n => ({\n  json: {\n    nachricht: n.slice(0, 4000),\n    entwuerfe: e,\n    hinweise,\n    pruefenAnzahl: pruefen,\n    pflichtOk,\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2560,
+        512
+      ],
+      "id": "3f45f87b-0112-4abb-ad59-fae640cbe14c",
+      "name": "Prüfen & aufbereiten"
+    },
+    {
+      "parameters": {
+        "chatId": "DEINE_TELEGRAM_CHAT_ID",
+        "text": "={{ $json.nachricht }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2784,
+        512
+      ],
+      "id": "75798f4a-439c-4d9e-bf05-5fb8cf13de0f",
+      "name": "Entwürfe an Handy",
+      "webhookId": "4ef6619a-40ca-4a7a-9cbf-59290200db5b"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "DEINE_TELEGRAM_CHAT_ID",
+        "message": "=Alle Entwürfe für „{{ $('Style-Guide & Regeln').first().json.titel }}“ sind da. Freigeben?",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double",
+            "approveLabel": "✅ Freigeben",
+            "disapproveLabel": "❌ Ablehnen"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3008,
+        512
+      ],
+      "id": "bed6fb4c-0f9b-410a-be7e-f7f511767444",
+      "name": "Freigabe am Handy",
+      "webhookId": "7d230ada-b786-4152-bc12-40659089f43f",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cccf6301-e1ca-47bc-8828-889959afac80",
+              "leftValue": "={{ $json.data.approved }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3232,
+        512
+      ],
+      "id": "5f4a3666-605c-4d11-a1f5-8749763c3c83",
+      "name": "Freigegeben?"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3440,
+        400
+      ],
+      "id": "62e99658-e530-44fa-a7a8-56660b0feb14",
+      "name": "An Buffer senden (Schritt 2)",
+      "notes": "Hier kommt später der Buffer-Knoten hin. Für die Prüfung: Posts als Entwurf in die Buffer-Warteschlange."
+    },
+    {
+      "parameters": {
+        "chatId": "DEINE_TELEGRAM_CHAT_ID",
+        "text": "=✅ Freigegeben: {{ $('Style-Guide & Regeln').first().json.titel }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3664,
+        400
+      ],
+      "id": "fb8be17e-ec4e-4dc3-8df3-26c5783926d4",
+      "name": "Bestätigung",
+      "webhookId": "6a1c399b-3b85-4357-8dc5-322c7e5688a8"
+    },
+    {
+      "parameters": {
+        "chatId": "DEINE_TELEGRAM_CHAT_ID",
+        "text": "=❌ Abgelehnt: {{ $('Style-Guide & Regeln').first().json.titel }}. Nichts wurde veröffentlicht.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3440,
+        624
+      ],
+      "id": "e25d174f-93d0-4d6d-bf2b-65561891adb4",
+      "name": "Abgelehnt-Info",
+      "webhookId": "95ad8d5d-abe7-43d9-afa4-a2db049a39a2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// FESTE REGELN, KEINE KI: Quelle prüfen, interne Abschnitte entfernen, Pflichtaussagen merken.\nconst q = $input.first().json;\nconst text = String(q.quelltext || '');\nconst MIN_WOERTER = 200;\nconst woerter = t => (String(t).trim().match(/\\S+/g) || []).length;\n\nconst intern = [], exakt = [];\nlet sauber = text.replace(/\\[\\[INTERN\\]\\]([\\s\\S]*?)\\[\\[\\/INTERN\\]\\]/g, (m, a) => { intern.push(a.trim()); return ''; });\nconst offen = /\\[\\[\\/?INTERN\\]\\]/.test(sauber) || intern.some(b => b.includes('[[INTERN]]')) ||\n  (sauber.match(/\\[\\[EXAKT\\]\\]/g) || []).length !== (sauber.match(/\\[\\[\\/EXAKT\\]\\]/g) || []).length;\nsauber = sauber.replace(/\\[\\[EXAKT\\]\\]([\\s\\S]*?)\\[\\[\\/EXAKT\\]\\]/g, (m, a) => { exakt.push(a.trim()); return a; })\n  .replace(/\\n{3,}/g, '\\n\\n').trim();\n\nif (!text.trim()) throw new Error('STOPP: Keine Quelle bzw. keine Abschrift gefunden.');\nif (offen) throw new Error('STOPP: Eine [[INTERN]]- oder [[EXAKT]]-Markierung ist nicht geschlossen. Abbruch, damit nichts Internes durchrutscht.');\nif (woerter(sauber) < MIN_WOERTER) throw new Error('STOPP: Nach dem Entfernen interner Abschnitte bleiben nur ' + woerter(sauber) + ' Wörter (Minimum ' + MIN_WOERTER + ').');\n\nreturn [{ json: { ...q, quelltext: sauber, quelle_original_woerter: woerter(text), quelle_woerter: woerter(sauber),\n  intern_abschnitte: intern, intern_entfernt: intern.length, pflichtaussagen: exakt, start: Date.now() } }];\n"
+      },
+      "id": "22bf9783-7064-4bd0-a552-1bb4f3653276",
+      "name": "Regeln: Quelle prüfen (ohne KI)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1648,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Schreibt eine Zeile ins Protokoll (Google Sheets), egal ob freigegeben oder abgelehnt.\nconst q = $('Regeln: Quelle prüfen (ohne KI)').first().json;\nconst p = $('Prüfen & aufbereiten').first().json;\nconst ok = $('Freigabe am Handy').first().json.data?.approved === true;\nreturn [{ json: {\n  zeitpunkt: new Date().toLocaleString('de-DE', { timeZone: 'Europe/Berlin' }),\n  titel: q.titel, herkunft: q.herkunft, video: q.videoUrl || '',\n  quelle_woerter: q.quelle_woerter, intern_entfernt: q.intern_entfernt,\n  pflichtaussagen: q.pflichtaussagen.length, pflicht_woertlich: p.pflichtOk ?? '',\n  hinweise: p.hinweise.length, pruefen_markierungen: p.pruefenAnzahl,\n  entscheidung: ok ? 'freigegeben' : 'abgelehnt',\n  minuten_bis_entscheidung: Math.round((Date.now() - q.start) / 6000) / 10\n}}];"
+      },
+      "id": "e3f309b8-d88b-42a3-9577-4e6ef594c894",
+      "name": "Protokoll-Zeile",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3932,
+        632
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Protokoll",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "a9546cf1-1bcb-4244-a219-e9c3738581a9",
+      "name": "Ins Protokoll (Google Sheets)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        4172,
+        632
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Neues YouTube-Video": {
+      "main": [
+        [
+          {
+            "node": "Video-Daten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Video-Daten": {
+      "main": [
+        [
+          {
+            "node": "Abschrift holen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Abschrift holen": {
+      "main": [
+        [
+          {
+            "node": "Quelle aus YouTube",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quelle aus YouTube": {
+      "main": [
+        [
+          {
+            "node": "Style-Guide & Regeln",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test-Formular": {
+      "main": [
+        [
+          {
+            "node": "Quelle aus Formular",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quelle aus Formular": {
+      "main": [
+        [
+          {
+            "node": "Style-Guide & Regeln",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Style-Guide & Regeln": {
+      "main": [
+        [
+          {
+            "node": "Regeln: Quelle prüfen (ohne KI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fakten ziehen (KI)": {
+      "main": [
+        [
+          {
+            "node": "Fakten lesen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fakten lesen": {
+      "main": [
+        [
+          {
+            "node": "Entwürfe schreiben (KI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entwürfe schreiben (KI)": {
+      "main": [
+        [
+          {
+            "node": "Prüfen & aufbereiten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prüfen & aufbereiten": {
+      "main": [
+        [
+          {
+            "node": "Entwürfe an Handy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Entwürfe an Handy": {
+      "main": [
+        [
+          {
+            "node": "Freigabe am Handy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Freigabe am Handy": {
+      "main": [
+        [
+          {
+            "node": "Freigegeben?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "An Buffer senden (Schritt 2)": {
+      "main": [
+        [
+          {
+            "node": "Bestätigung",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Freigegeben?": {
+      "main": [
+        [
+          {
+            "node": "An Buffer senden (Schritt 2)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Abgelehnt-Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini (genau)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Fakten ziehen (KI)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini (kreativ)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Entwürfe schreiben (KI)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Regeln: Quelle prüfen (ohne KI)": {
+      "main": [
+        [
+          {
+            "node": "Fakten ziehen (KI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bestätigung": {
+      "main": [
+        [
+          {
+            "node": "Protokoll-Zeile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Abgelehnt-Info": {
+      "main": [
+        [
+          {
+            "node": "Protokoll-Zeile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Protokoll-Zeile": {
+      "main": [
+        [
+          {
+            "node": "Ins Protokoll (Google Sheets)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "tags": []
+}
